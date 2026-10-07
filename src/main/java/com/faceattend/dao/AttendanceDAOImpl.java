@@ -5,6 +5,7 @@ import com.faceattend.model.AttendanceRecord;
 import com.faceattend.model.AttendanceStatus;
 
 import java.sql.*;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -78,6 +79,45 @@ public class AttendanceDAOImpl implements AttendanceDAO {
             }
         }
         return tally;
+    }
+
+    @Override
+    public List<AttendanceRecord> findUnsynced() throws SQLException {
+        String sql = "SELECT * FROM attendance_records WHERE synced = FALSE ORDER BY record_id";
+        List<AttendanceRecord> result = new ArrayList<>();
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                result.add(mapRow(rs));
+            }
+        }
+        return result;
+    }
+
+    @Override
+    public boolean markSynced(int recordId) throws SQLException {
+        String sql = "UPDATE attendance_records SET synced = TRUE WHERE record_id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, recordId);
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    private AttendanceRecord mapRow(ResultSet rs) throws SQLException {
+        AttendanceRecord record = new AttendanceRecord();
+        record.setRecordId(rs.getInt("record_id"));
+        record.setStudentId(rs.getInt("student_id"));
+        int markedBy = rs.getInt("marked_by");
+        if (!rs.wasNull()) record.setMarkedBy(markedBy);
+        record.setAttendanceDate(rs.getDate("attendance_date").toLocalDate());
+        record.setTimeMarked(rs.getTimestamp("time_marked").toLocalDateTime());
+        record.setStatus(AttendanceStatus.valueOf(rs.getString("status")));
+        record.setLivenessPassed(rs.getBoolean("liveness_passed"));
+        record.setMatchConfidence(rs.getDouble("match_confidence"));
+        record.setSynced(rs.getBoolean("synced"));
+        return record;
     }
 
     private void bindRecord(PreparedStatement ps, AttendanceRecord record) throws SQLException {

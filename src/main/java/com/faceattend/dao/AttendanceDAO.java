@@ -14,4 +14,8 @@ public interface AttendanceDAO {
     boolean existsForStudentOnDate(int studentId, LocalDate date) throws SQLException;
 
     Map<String, Integer> markBatch(List<AttendanceRecord> records) throws SQLException;
+
+    List<AttendanceRecord> findUnsynced() throws SQLException;
+
+    boolean markSynced(int recordId) throws SQLException;
 }

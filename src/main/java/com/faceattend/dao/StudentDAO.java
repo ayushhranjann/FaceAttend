@@ -1,4 +1,4 @@
-*package com.faceattend.dao;
+package com.faceattend.dao;
 
 import com.faceattend.model.Student;
 
