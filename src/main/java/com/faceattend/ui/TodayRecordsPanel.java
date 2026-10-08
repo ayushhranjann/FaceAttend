@@ -24,7 +24,7 @@ public class TodayRecordsPanel extends JPanel {
     private final AttendanceDAO attendanceDAO = new AttendanceDAOImpl();
     private final StudentDAO studentDAO = new StudentDAOImpl();
     private final DefaultTableModel tableModel =
-            new DefaultTableModel(new Object[]{"Roll No.", "Name", "Status", "Confidence", "Time", "Synced"}, 0) {
+            new DefaultTableModel(new Object[]{"Roll No.", "Name", "Status", "Method", "Confidence", "Time", "Synced"}, 0) {
                 @Override
                 public boolean isCellEditable(int row, int column) {
                     return false;
@@ -68,17 +68,27 @@ public class TodayRecordsPanel extends JPanel {
 
             List<AttendanceRecord> records = attendanceDAO.findByDate(LocalDate.now());
             Map<String, Integer> counts = new HashMap<>();
+            int scanCount = 0;
+            int manualCount = 0;
 
             for (AttendanceRecord record : records) {
                 Student student = studentsById.get(record.getStudentId());
                 String status = record.getStatus().name();
                 counts.merge(status, 1, Integer::sum);
 
+                boolean byScan = record.getMatchConfidence() > 0;
+                if (byScan) {
+                    scanCount++;
+                } else {
+                    manualCount++;
+                }
+
                 tableModel.addRow(new Object[]{
                         student != null ? student.getRollNumber() : "?",
                         student != null ? student.getFullName() : "Unknown",
                         status,
-                        record.getMatchConfidence() > 0 ? record.getMatchConfidence() : "-",
+                        byScan ? "Face scan" : "Manual",
+                        byScan ? record.getMatchConfidence() : "-",
                         record.getTimeMarked().format(TIME_FORMAT),
                         record.isSynced() ? "Yes" : "No"
                 });
@@ -91,7 +101,8 @@ public class TodayRecordsPanel extends JPanel {
                 summaryLabel.setText("Total: " + records.size()
                         + " | Present: " + counts.getOrDefault("PRESENT", 0)
                         + " | Flagged: " + counts.getOrDefault("MANUAL_OVERRIDE", 0)
-                        + " | Absent: " + counts.getOrDefault("ABSENT", 0));
+                        + " | Absent: " + counts.getOrDefault("ABSENT", 0)
+                        + "   ||   Face scan: " + scanCount + " | Manual: " + manualCount);
             }
         } catch (SQLException e) {
             summaryLabel.setForeground(Color.RED);

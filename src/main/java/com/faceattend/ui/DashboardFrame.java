@@ -16,8 +16,14 @@ public class DashboardFrame extends JFrame {
         setLayout(new BorderLayout());
 
         JLabel welcome = new JLabel("Logged in as: " + user.describe());
-        welcome.setBorder(BorderFactory.createEmptyBorder(8, 16, 8, 16));
-        add(welcome, BorderLayout.NORTH);
+        JButton logoutButton = new JButton("Logout");
+        logoutButton.addActionListener(e -> logout());
+
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBorder(BorderFactory.createEmptyBorder(8, 16, 8, 16));
+        header.add(welcome, BorderLayout.WEST);
+        header.add(logoutButton, BorderLayout.EAST);
+        add(header, BorderLayout.NORTH);
 
         Role role = user.getRole();
         boolean isAdmin = role == Role.ADMIN;
@@ -50,5 +56,10 @@ public class DashboardFrame extends JFrame {
         });
 
         add(tabs, BorderLayout.CENTER);
+    }
+
+    private void logout() {
+        new LoginFrame().setVisible(true);
+        dispose();
     }
 }
