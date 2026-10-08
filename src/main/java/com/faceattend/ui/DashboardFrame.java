@@ -1,5 +1,6 @@
 package com.faceattend.ui;
 
+import com.faceattend.model.Role;
 import com.faceattend.model.User;
 
 import javax.swing.*;
@@ -18,15 +19,23 @@ public class DashboardFrame extends JFrame {
         welcome.setBorder(BorderFactory.createEmptyBorder(8, 16, 8, 16));
         add(welcome, BorderLayout.NORTH);
 
-        TakeAttendancePanel attendancePanel = new TakeAttendancePanel(user);
-        ReviewPanel reviewPanel = new ReviewPanel();
-        TodayRecordsPanel recordsPanel = new TodayRecordsPanel();
+        Role role = user.getRole();
+        boolean isAdmin = role == Role.ADMIN;
+        boolean canMark = role == Role.ADMIN || role == Role.TEACHER;
+
+        final TakeAttendancePanel attendancePanel = canMark ? new TakeAttendancePanel(user) : null;
+        final ReviewPanel reviewPanel = canMark ? new ReviewPanel() : null;
+        final TodayRecordsPanel recordsPanel = new TodayRecordsPanel();
 
         JTabbedPane tabs = new JTabbedPane();
-        tabs.addTab("Enroll Student", new EnrollStudentPanel());
+        if (isAdmin) {
+            tabs.addTab("Enroll Student", new EnrollStudentPanel());
+        }
         tabs.addTab("Student Directory", new StudentListPanel());
-        tabs.addTab("Take Attendance", attendancePanel);
-        tabs.addTab("Review Flagged", reviewPanel);
+        if (canMark) {
+            tabs.addTab("Take Attendance", attendancePanel);
+            tabs.addTab("Review Flagged", reviewPanel);
+        }
         tabs.addTab("Today's Records", recordsPanel);
 
         tabs.addChangeListener(e -> {
