@@ -71,6 +71,10 @@ public class TakeAttendancePanel extends JPanel {
         });
         add(new JScrollPane(studentList), BorderLayout.CENTER);
 
+        JButton selectAllButton = new JButton("Select All");
+        selectAllButton.addActionListener(e -> setAllPresent(true));
+        JButton clearButton = new JButton("Clear");
+        clearButton.addActionListener(e -> setAllPresent(false));
         JButton manualButton = new JButton("Mark Manually");
         manualButton.addActionListener(e -> submitSession(false));
         JButton scanButton = new JButton("Scan Faces (Simulated)");
@@ -78,6 +82,8 @@ public class TakeAttendancePanel extends JPanel {
         syncButton.addActionListener(e -> startSync());
 
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        buttons.add(selectAllButton);
+        buttons.add(clearButton);
         buttons.add(manualButton);
         buttons.add(scanButton);
         buttons.add(syncButton);
@@ -103,6 +109,14 @@ public class TakeAttendancePanel extends JPanel {
         }
     }
 
+    private void setAllPresent(boolean value) {
+        for (int i = 0; i < listModel.size(); i++) {
+            Entry entry = listModel.get(i);
+            entry.present = value;
+            listModel.set(i, entry);
+        }
+    }
+
     private void submitSession(boolean faceScan) {
         List<Student> roster = new ArrayList<>();
         Set<Integer> present = new HashSet<>();
@@ -117,6 +131,20 @@ public class TakeAttendancePanel extends JPanel {
         if (roster.isEmpty()) {
             showStatus("No students enrolled yet.", Color.RED);
             return;
+        }
+
+        if (present.isEmpty()) {
+            if (faceScan) {
+                showStatus("Tick the students who are in front of the camera before scanning.", Color.RED);
+                return;
+            }
+            int choice = JOptionPane.showConfirmDialog(this,
+                    "No student is ticked. This will mark all " + roster.size()
+                            + " students ABSENT for today and cannot be redone. Continue?",
+                    "Confirm", JOptionPane.YES_NO_OPTION);
+            if (choice != JOptionPane.YES_OPTION) {
+                return;
+            }
         }
 
         try {
