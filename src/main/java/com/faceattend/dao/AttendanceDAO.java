@@ -1,11 +1,14 @@
 package com.faceattend.dao;
 
 import com.faceattend.model.AttendanceRecord;
+import com.faceattend.model.AttendanceStatus;
+
 
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+
 
 public interface AttendanceDAO {
 
@@ -18,4 +21,8 @@ public interface AttendanceDAO {
     List<AttendanceRecord> findUnsynced() throws SQLException;
 
     boolean markSynced(int recordId) throws SQLException;
+
+    List<AttendanceRecord> findByDateAndStatus(LocalDate date, AttendanceStatus status) throws SQLException;
+
+    boolean updateStatus(int recordId, AttendanceStatus status) throws SQLException;
 }

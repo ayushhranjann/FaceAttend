@@ -105,6 +105,36 @@ public class AttendanceDAOImpl implements AttendanceDAO {
         }
     }
 
+    @Override
+    public List<AttendanceRecord> findByDateAndStatus(java.time.LocalDate date, AttendanceStatus status) throws SQLException {
+        String sql = "SELECT * FROM attendance_records WHERE attendance_date = ? AND status = ? ORDER BY record_id";
+        List<AttendanceRecord> result = new ArrayList<>();
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setDate(1, Date.valueOf(date));
+            ps.setString(2, status.name());
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    result.add(mapRow(rs));
+                }
+            }
+        }
+        return result;
+    }
+
+    @Override
+    public boolean updateStatus(int recordId, AttendanceStatus status) throws SQLException {
+        String sql = "UPDATE attendance_records SET status = ?, synced = FALSE WHERE record_id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, status.name());
+            ps.setInt(2, recordId);
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+
+
     private AttendanceRecord mapRow(ResultSet rs) throws SQLException {
         AttendanceRecord record = new AttendanceRecord();
         record.setRecordId(rs.getInt("record_id"));
