@@ -132,6 +132,21 @@ public class AttendanceDAOImpl implements AttendanceDAO {
             return ps.executeUpdate() > 0;
         }
     }
+        @Override
+    public List<AttendanceRecord> findByDate(java.time.LocalDate date) throws SQLException {
+        String sql = "SELECT * FROM attendance_records WHERE attendance_date = ? ORDER BY record_id";
+        List<AttendanceRecord> result = new ArrayList<>();
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setDate(1, Date.valueOf(date));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    result.add(mapRow(rs));
+                }
+            }
+        }
+        return result;
+    }
 
 
 

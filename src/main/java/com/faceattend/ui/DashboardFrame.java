@@ -10,7 +10,7 @@ public class DashboardFrame extends JFrame {
     public DashboardFrame(User user) {
         super("FaceAttend - Dashboard");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setSize(850, 600);
+        setSize(900, 600);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
 
@@ -20,12 +20,14 @@ public class DashboardFrame extends JFrame {
 
         TakeAttendancePanel attendancePanel = new TakeAttendancePanel(user);
         ReviewPanel reviewPanel = new ReviewPanel();
+        TodayRecordsPanel recordsPanel = new TodayRecordsPanel();
 
         JTabbedPane tabs = new JTabbedPane();
         tabs.addTab("Enroll Student", new EnrollStudentPanel());
         tabs.addTab("Student Directory", new StudentListPanel());
         tabs.addTab("Take Attendance", attendancePanel);
         tabs.addTab("Review Flagged", reviewPanel);
+        tabs.addTab("Today's Records", recordsPanel);
 
         tabs.addChangeListener(e -> {
             Component selected = tabs.getSelectedComponent();
@@ -33,6 +35,8 @@ public class DashboardFrame extends JFrame {
                 attendancePanel.reloadRoster();
             } else if (selected == reviewPanel) {
                 reviewPanel.reload();
+            } else if (selected == recordsPanel) {
+                recordsPanel.reload();
             }
         });
 

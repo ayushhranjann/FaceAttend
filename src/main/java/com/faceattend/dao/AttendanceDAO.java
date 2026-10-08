@@ -25,4 +25,5 @@ public interface AttendanceDAO {
     List<AttendanceRecord> findByDateAndStatus(LocalDate date, AttendanceStatus status) throws SQLException;
 
     boolean updateStatus(int recordId, AttendanceStatus status) throws SQLException;
+    List<AttendanceRecord> findByDate(LocalDate date) throws SQLException;
 }
