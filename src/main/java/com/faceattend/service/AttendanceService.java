@@ -13,6 +13,8 @@ import java.util.*;
 public class AttendanceService {
 
     public static final double CONFIDENCE_THRESHOLD = 85.0;
+    private static final double DETECTION_CHANCE = 0.90;
+    private static final double HIGH_CONFIDENCE_CHANCE = 0.80;
 
     private final AttendanceDAO attendanceDAO;
     private final Random random = new Random();
@@ -36,43 +38,16 @@ public class AttendanceService {
 
     public Map<String, Integer> markSessionManual(List<Student> roster, Set<Integer> presentStudentIds,
                                                    Integer markedBy) throws SQLException {
-        return markSession(roster, presentStudentIds, markedBy, false);
-    }
-
-    public Map<String, Integer> markSessionByFaceScan(List<Student> roster, Set<Integer> presentStudentIds,
-                                                       Integer markedBy) throws SQLException {
-        return markSession(roster, presentStudentIds, markedBy, true);
-    }
-
-    private Map<String, Integer> markSession(List<Student> roster, Set<Integer> presentStudentIds,
-                                              Integer markedBy, boolean faceScan) throws SQLException {
         LocalDate today = LocalDate.now();
-
-        Set<Integer> alreadyMarked = new HashSet<>();
-        for (Student s : roster) {
-            if (attendanceDAO.existsForStudentOnDate(s.getStudentId(), today)) {
-                alreadyMarked.add(s.getStudentId());
-            }
-        }
-
         List<AttendanceRecord> batch = new ArrayList<>();
-        for (Student s : roster) {
-            if (alreadyMarked.contains(s.getStudentId())) continue;
 
-            AttendanceRecord record;
-            if (presentStudentIds.contains(s.getStudentId())) {
-                if (faceScan) {
-                    double confidence = simulateConfidence();
-                    AttendanceStatus status = (confidence >= CONFIDENCE_THRESHOLD)
-                            ? AttendanceStatus.PRESENT
-                            : AttendanceStatus.MANUAL_OVERRIDE;
-                    record = new AttendanceRecord(s.getStudentId(), today, status, true, confidence);
-                } else {
-                    record = new AttendanceRecord(s.getStudentId(), today, AttendanceStatus.PRESENT, false, 0.0);
-                }
-            } else {
-                record = new AttendanceRecord(s.getStudentId(), today, AttendanceStatus.ABSENT, false, 0.0);
-            }
+        for (Student s : roster) {
+            if (attendanceDAO.existsForStudentOnDate(s.getStudentId(), today)) continue;
+
+            AttendanceStatus status = presentStudentIds.contains(s.getStudentId())
+                    ? AttendanceStatus.PRESENT
+                    : AttendanceStatus.ABSENT;
+            AttendanceRecord record = new AttendanceRecord(s.getStudentId(), today, status, false, 0.0);
             record.setMarkedBy(markedBy);
             batch.add(record);
         }
@@ -80,7 +55,31 @@ public class AttendanceService {
         return attendanceDAO.markBatch(batch);
     }
 
-       private static final double HIGH_CONFIDENCE_CHANCE = 0.80;
+    public Map<String, Integer> scanSession(List<Student> roster, Integer markedBy) throws SQLException {
+        LocalDate today = LocalDate.now();
+        List<AttendanceRecord> batch = new ArrayList<>();
+        int notDetected = 0;
+
+        for (Student s : roster) {
+            if (attendanceDAO.existsForStudentOnDate(s.getStudentId(), today)) continue;
+
+            if (random.nextDouble() < DETECTION_CHANCE) {
+                double confidence = simulateConfidence();
+                AttendanceStatus status = (confidence >= CONFIDENCE_THRESHOLD)
+                        ? AttendanceStatus.PRESENT
+                        : AttendanceStatus.MANUAL_OVERRIDE;
+                AttendanceRecord record = new AttendanceRecord(s.getStudentId(), today, status, true, confidence);
+                record.setMarkedBy(markedBy);
+                batch.add(record);
+            } else {
+                notDetected++;
+            }
+        }
+
+        Map<String, Integer> tally = attendanceDAO.markBatch(batch);
+        tally.put("NOT_DETECTED", notDetected);
+        return tally;
+    }
 
     private double simulateConfidence() {
         double value;

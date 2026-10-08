@@ -14,6 +14,7 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -46,11 +47,12 @@ public class TakeAttendancePanel extends JPanel {
 
         JLabel title = new JLabel("Take Attendance");
         title.setFont(title.getFont().deriveFont(Font.BOLD, 18f));
-        JLabel info = new JLabel("<html>Tick the students who are present in the room.<br>"
-                + "<b>Mark Manually</b> records them directly as PRESENT, with no score.<br>"
-                + "<b>Scan Faces (Simulated)</b> runs a mock face match on them: a confidence of "
-                + AttendanceService.CONFIDENCE_THRESHOLD + " or above is auto-marked PRESENT, "
-                + "below that is flagged for teacher review. (No real camera is used.)</html>");
+        JLabel info = new JLabel("<html>The list shows students with no record yet today.<br>"
+                + "<b>Scan Faces (Simulated)</b> mock-recognises students automatically: a confidence of "
+                + AttendanceService.CONFIDENCE_THRESHOLD + " or above is auto-marked PRESENT, below that is "
+                + "flagged for review. Students it does not recognise stay in the list.<br>"
+                + "<b>Mark Manually</b>: tick the students who are present and press it. Ticked become PRESENT, "
+                + "unticked become ABSENT. (No real camera is used.)</html>");
 
         JPanel top = new JPanel(new BorderLayout(4, 4));
         top.add(title, BorderLayout.NORTH);
@@ -71,21 +73,21 @@ public class TakeAttendancePanel extends JPanel {
         });
         add(new JScrollPane(studentList), BorderLayout.CENTER);
 
+        JButton scanButton = new JButton("Scan Faces (Simulated)");
+        scanButton.addActionListener(e -> runScan());
         JButton selectAllButton = new JButton("Select All");
         selectAllButton.addActionListener(e -> setAllPresent(true));
         JButton clearButton = new JButton("Clear");
         clearButton.addActionListener(e -> setAllPresent(false));
         JButton manualButton = new JButton("Mark Manually");
-        manualButton.addActionListener(e -> submitSession(false));
-        JButton scanButton = new JButton("Scan Faces (Simulated)");
-        scanButton.addActionListener(e -> submitSession(true));
+        manualButton.addActionListener(e -> submitManual());
         syncButton.addActionListener(e -> startSync());
 
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        buttons.add(scanButton);
         buttons.add(selectAllButton);
         buttons.add(clearButton);
         buttons.add(manualButton);
-        buttons.add(scanButton);
         buttons.add(syncButton);
 
         JPanel messages = new JPanel(new GridLayout(2, 1));
@@ -101,8 +103,11 @@ public class TakeAttendancePanel extends JPanel {
     public void reloadRoster() {
         try {
             listModel.clear();
+            LocalDate today = LocalDate.now();
             for (Student student : studentDAO.findAll()) {
-                listModel.addElement(new Entry(student));
+                if (!attendanceDAO.existsForStudentOnDate(student.getStudentId(), today)) {
+                    listModel.addElement(new Entry(student));
+                }
             }
         } catch (SQLException e) {
             showStatus("Could not load students: " + e.getMessage(), Color.RED);
@@ -117,30 +122,54 @@ public class TakeAttendancePanel extends JPanel {
         }
     }
 
-    private void submitSession(boolean faceScan) {
+    private List<Student> currentRoster() {
         List<Student> roster = new ArrayList<>();
+        for (int i = 0; i < listModel.size(); i++) {
+            roster.add(listModel.get(i).student);
+        }
+        return roster;
+    }
+
+    private void runScan() {
+        List<Student> roster = currentRoster();
+        if (roster.isEmpty()) {
+            showStatus("Nobody is pending: everyone already has a record today, or no students are enrolled.", Color.RED);
+            return;
+        }
+
+        try {
+            Map<String, Integer> tally = attendanceService.scanSession(roster, currentUser.getUserId());
+            int notDetected = tally.getOrDefault("NOT_DETECTED", 0);
+            showStatus("Face scan done. Present: " + tally.getOrDefault("PRESENT", 0)
+                    + " | Flagged for review: " + tally.getOrDefault("MANUAL_OVERRIDE", 0)
+                    + " | Not recognised: " + notDetected
+                    + (notDetected > 0 ? " (still in the list, mark them manually)" : ""),
+                    new Color(0, 130, 0));
+            reloadRoster();
+        } catch (SQLException e) {
+            showStatus("Scan failed and was rolled back: " + e.getMessage(), Color.RED);
+        }
+    }
+
+    private void submitManual() {
+        List<Student> roster = currentRoster();
         Set<Integer> present = new HashSet<>();
         for (int i = 0; i < listModel.size(); i++) {
             Entry entry = listModel.get(i);
-            roster.add(entry.student);
             if (entry.present) {
                 present.add(entry.student.getStudentId());
             }
         }
 
         if (roster.isEmpty()) {
-            showStatus("No students enrolled yet.", Color.RED);
+            showStatus("Nobody is pending: everyone already has a record today, or no students are enrolled.", Color.RED);
             return;
         }
 
         if (present.isEmpty()) {
-            if (faceScan) {
-                showStatus("Tick the students who are in front of the camera before scanning.", Color.RED);
-                return;
-            }
             int choice = JOptionPane.showConfirmDialog(this,
                     "No student is ticked. This will mark all " + roster.size()
-                            + " students ABSENT for today and cannot be redone. Continue?",
+                            + " listed students ABSENT for today and cannot be redone. Continue?",
                     "Confirm", JOptionPane.YES_NO_OPTION);
             if (choice != JOptionPane.YES_OPTION) {
                 return;
@@ -148,18 +177,10 @@ public class TakeAttendancePanel extends JPanel {
         }
 
         try {
-            Map<String, Integer> tally = faceScan
-                    ? attendanceService.markSessionByFaceScan(roster, present, currentUser.getUserId())
-                    : attendanceService.markSessionManual(roster, present, currentUser.getUserId());
-            int total = tally.values().stream().mapToInt(Integer::intValue).sum();
-            if (total == 0) {
-                showStatus("Today's attendance was already recorded for everyone.", Color.RED);
-                return;
-            }
-            showStatus((faceScan ? "Face scan saved. " : "Manual attendance saved. ")
-                    + "Present: " + tally.getOrDefault("PRESENT", 0)
-                    + " | Flagged for review: " + tally.getOrDefault("MANUAL_OVERRIDE", 0)
+            Map<String, Integer> tally = attendanceService.markSessionManual(roster, present, currentUser.getUserId());
+            showStatus("Manual attendance saved. Present: " + tally.getOrDefault("PRESENT", 0)
                     + " | Absent: " + tally.getOrDefault("ABSENT", 0), new Color(0, 130, 0));
+            reloadRoster();
         } catch (SQLException e) {
             showStatus("Session failed and was rolled back: " + e.getMessage(), Color.RED);
         }
