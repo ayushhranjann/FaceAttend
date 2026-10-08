@@ -80,8 +80,15 @@ public class AttendanceService {
         return attendanceDAO.markBatch(batch);
     }
 
+       private static final double HIGH_CONFIDENCE_CHANCE = 0.80;
+
     private double simulateConfidence() {
-        double value = 70.0 + random.nextDouble() * 30.0;
+        double value;
+        if (random.nextDouble() < HIGH_CONFIDENCE_CHANCE) {
+            value = CONFIDENCE_THRESHOLD + random.nextDouble() * (100.0 - CONFIDENCE_THRESHOLD);
+        } else {
+            value = 70.0 + random.nextDouble() * (CONFIDENCE_THRESHOLD - 70.0);
+        }
         return Math.round(value * 100.0) / 100.0;
     }
 }
