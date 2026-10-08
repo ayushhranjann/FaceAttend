@@ -46,10 +46,11 @@ public class TakeAttendancePanel extends JPanel {
 
         JLabel title = new JLabel("Take Attendance");
         title.setFont(title.getFont().deriveFont(Font.BOLD, 18f));
-        JLabel info = new JLabel("<html>Tick the students who are present. Each ticked student gets a "
-                + "<b>simulated face-match confidence</b> score. At or above "
-                + AttendanceService.CONFIDENCE_THRESHOLD + " they are auto-marked PRESENT; below that they are "
-                + "flagged for teacher review. (Camera integration is out of scope for this project.)</html>");
+        JLabel info = new JLabel("<html>Tick the students who are present in the room.<br>"
+                + "<b>Mark Manually</b> records them directly as PRESENT, with no score.<br>"
+                + "<b>Scan Faces (Simulated)</b> runs a mock face match on them: a confidence of "
+                + AttendanceService.CONFIDENCE_THRESHOLD + " or above is auto-marked PRESENT, "
+                + "below that is flagged for teacher review. (No real camera is used.)</html>");
 
         JPanel top = new JPanel(new BorderLayout(4, 4));
         top.add(title, BorderLayout.NORTH);
@@ -70,12 +71,15 @@ public class TakeAttendancePanel extends JPanel {
         });
         add(new JScrollPane(studentList), BorderLayout.CENTER);
 
-        JButton submitButton = new JButton("Submit Session");
-        submitButton.addActionListener(e -> submitSession());
+        JButton manualButton = new JButton("Mark Manually");
+        manualButton.addActionListener(e -> submitSession(false));
+        JButton scanButton = new JButton("Scan Faces (Simulated)");
+        scanButton.addActionListener(e -> submitSession(true));
         syncButton.addActionListener(e -> startSync());
 
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        buttons.add(submitButton);
+        buttons.add(manualButton);
+        buttons.add(scanButton);
         buttons.add(syncButton);
 
         JPanel messages = new JPanel(new GridLayout(2, 1));
@@ -99,7 +103,7 @@ public class TakeAttendancePanel extends JPanel {
         }
     }
 
-    private void submitSession() {
+    private void submitSession(boolean faceScan) {
         List<Student> roster = new ArrayList<>();
         Set<Integer> present = new HashSet<>();
         for (int i = 0; i < listModel.size(); i++) {
@@ -116,13 +120,16 @@ public class TakeAttendancePanel extends JPanel {
         }
 
         try {
-            Map<String, Integer> tally = attendanceService.markSession(roster, present, currentUser.getUserId());
+            Map<String, Integer> tally = faceScan
+                    ? attendanceService.markSessionByFaceScan(roster, present, currentUser.getUserId())
+                    : attendanceService.markSessionManual(roster, present, currentUser.getUserId());
             int total = tally.values().stream().mapToInt(Integer::intValue).sum();
             if (total == 0) {
                 showStatus("Today's attendance was already recorded for everyone.", Color.RED);
                 return;
             }
-            showStatus("Session saved. Present: " + tally.getOrDefault("PRESENT", 0)
+            showStatus((faceScan ? "Face scan saved. " : "Manual attendance saved. ")
+                    + "Present: " + tally.getOrDefault("PRESENT", 0)
                     + " | Flagged for review: " + tally.getOrDefault("MANUAL_OVERRIDE", 0)
                     + " | Absent: " + tally.getOrDefault("ABSENT", 0), new Color(0, 130, 0));
         } catch (SQLException e) {

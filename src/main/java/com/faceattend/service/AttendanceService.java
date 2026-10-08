@@ -34,8 +34,18 @@ public class AttendanceService {
         return attendanceDAO.create(record);
     }
 
-    public Map<String, Integer> markSession(List<Student> roster, Set<Integer> presentStudentIds,
-                                             Integer markedBy) throws SQLException {
+    public Map<String, Integer> markSessionManual(List<Student> roster, Set<Integer> presentStudentIds,
+                                                   Integer markedBy) throws SQLException {
+        return markSession(roster, presentStudentIds, markedBy, false);
+    }
+
+    public Map<String, Integer> markSessionByFaceScan(List<Student> roster, Set<Integer> presentStudentIds,
+                                                       Integer markedBy) throws SQLException {
+        return markSession(roster, presentStudentIds, markedBy, true);
+    }
+
+    private Map<String, Integer> markSession(List<Student> roster, Set<Integer> presentStudentIds,
+                                              Integer markedBy, boolean faceScan) throws SQLException {
         LocalDate today = LocalDate.now();
 
         Set<Integer> alreadyMarked = new HashSet<>();
@@ -51,11 +61,15 @@ public class AttendanceService {
 
             AttendanceRecord record;
             if (presentStudentIds.contains(s.getStudentId())) {
-                double confidence = simulateConfidence();
-                AttendanceStatus status = (confidence >= CONFIDENCE_THRESHOLD)
-                        ? AttendanceStatus.PRESENT
-                        : AttendanceStatus.MANUAL_OVERRIDE;
-                record = new AttendanceRecord(s.getStudentId(), today, status, true, confidence);
+                if (faceScan) {
+                    double confidence = simulateConfidence();
+                    AttendanceStatus status = (confidence >= CONFIDENCE_THRESHOLD)
+                            ? AttendanceStatus.PRESENT
+                            : AttendanceStatus.MANUAL_OVERRIDE;
+                    record = new AttendanceRecord(s.getStudentId(), today, status, true, confidence);
+                } else {
+                    record = new AttendanceRecord(s.getStudentId(), today, AttendanceStatus.PRESENT, false, 0.0);
+                }
             } else {
                 record = new AttendanceRecord(s.getStudentId(), today, AttendanceStatus.ABSENT, false, 0.0);
             }
