@@ -35,3 +35,9 @@ CREATE TABLE IF NOT EXISTS attendance_records (
     CONSTRAINT fk_attendance_marked_by FOREIGN KEY (marked_by) REFERENCES users(user_id),
     CONSTRAINT uq_student_date UNIQUE (student_id, attendance_date)
 );
+
+
+INSERT IGNORE INTO users (username, password, full_name, role) VALUES
+('admin', 'admin123', 'Administrator', 'ADMIN'),
+('teacher', 'teacher123', 'Class Teacher', 'TEACHER'),
+('inspector', 'inspector123', 'Inspection Officer', 'INSPECTOR');
