@@ -1,0 +1,5 @@
+src/main/resources/db.properties.example# Copy this file to db.properties (same folder) and fill in your own details.
+# Docker setup from the README uses port 3307. A native MySQL install usually uses 3306.
+db.url=jdbc:mysql://127.0.0.1:3307/faceattend?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+db.user=root
+db.password=YOUR_PASSWORD_HERE
